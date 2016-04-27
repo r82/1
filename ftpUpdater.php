@@ -128,15 +128,18 @@ if (isset($_POST) and array_key_exists('update_ftp', $_POST) and array_key_exist
 		echo "<b>[$connection_id]: </b>: ". display_connection_params($_SESSION['connections_params'][$connection_id]);
 		echo "\n";
 		extract($_SESSION['connections_params'][$connection_id]);
-		$ftp_conn = ftp_connect($ftp_server) or die("Could not connect to $ftp_server");
+		$ftp_conn = ftp_connect($ftp_server);
 		echo "ftp_conn: $ftp_conn";
 		echo "\n";
 		$ftp_login = ftp_login($ftp_conn, $ftp_username, $ftp_userpass);
 		echo "ftp_login: $ftp_login";
-		// $ftp_list = ftp_list($ftp_conn, $remote_dir);
-		// print_r($ftp_list);
-		$rawlist = ftp_rawlist($ftp_conn, $remote_dir);
-		echo $rawlist;
+		echo "\n";
+		$ftp_pasv = ftp_pasv($ftp_conn, true);
+		echo "ftp_pasv: $ftp_pasv";
+		echo "\n";
+		$ftp_list = ftp_list($ftp_conn, $remote_dir, false);
+		print_r($ftp_list);
+		ftp_close($ftp_conn);
 		echo "\n\n";
 	}
 }
@@ -144,7 +147,7 @@ if (isset($_POST) and array_key_exists('update_ftp', $_POST) and array_key_exist
 
 exit();
 
-$file_list = ftp_nlist($ftp_conn, $remote_dir);
+
 
 echo "<pre>";
 
@@ -221,7 +224,7 @@ function print_info($msg, $status) {
 	return "<span style='color: $color'>$msg</span>";
 }
 
-function ftp_list($ftp_conn, $remote_dir, $recursive = false, $include_parent = false) {
+function ftp_list($ftp_conn, $remote_dir, $recursive = false, $include_parent = false, $filter = false) {
 	$rawlist = ftp_rawlist($ftp_conn, $remote_dir);
 	// file_put_contents("ftpUpdater_rawlist.txt", join("\n", $rawlist));
 	// $rawlist = explode("\n",file_get_contents("ftpUpdater_rawlist.txt"));

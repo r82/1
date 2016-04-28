@@ -1,6 +1,7 @@
 <?php
 error_reporting(E_ALL);
 function exception_error_handler($errno, $errstr, $errfile, $errline ) {
+  echo "<pre style='white-space: pre-wrap;'>";
   throw new ErrorException($errstr, 0, $errno, $errfile, $errline);
 }
 set_error_handler("exception_error_handler");
@@ -13,6 +14,10 @@ if (isset($_POST) and array_key_exists('session_unset', $_POST)) {
 print_r($_POST);
 
 if (isset($_POST) and array_key_exists('clear_selected_connections', $_POST)) {
+	if (!array_key_exists('connections_ids', $_POST)) {
+		echo print_html_err("no connections selected");
+		$_POST['connections_ids'] = array();
+	}
 	foreach ($_POST['connections_ids'] as $connection_id) {
 		unset($_SESSION['connections_params'][$connection_id]);
 	}
@@ -24,7 +29,7 @@ if (!array_key_exists('connection_params', $_SESSION)) {
 	$_SESSION['connection_params'] = array();
 }
 if (isset($_POST) and array_key_exists('submit_connection', $_POST)) {
-	foreach(array('ftp_server', 'ftp_username', 'ftp_userpass', 'remote_dir', 'local_dir', 'filter') as $key) {
+	foreach(array('ftp_server', 'ftp_username', 'ftp_userpass', 'remote_dir', 'local_dir', 'regex_filter') as $key) {
 		if (!array_key_exists($key, $_POST)) continue;
 		$_POST[$key] = trim($_POST[$key]);
 		$connection_params[$key] = $_POST[$key];
@@ -98,7 +103,7 @@ if (isset($_POST) and array_key_exists('submit_connection', $_POST)) {
 	<?php echo show_input_field('ftp_userpass', $_SESSION['connection_params'], "password"); ?>
 	<?php echo show_input_field('remote_dir', $_SESSION['connection_params']); ?>
 	<?php echo show_input_field('local_dir', $_SESSION['connection_params']); ?>
-	<?php echo show_input_field('filter', $_SESSION['connection_params']); ?>
+	<?php echo show_input_field('regex_filter', $_SESSION['connection_params']); ?>
 	<input type="submit" name='submit_connection' value="submit_connection">
 </form>
 <pre>
@@ -123,7 +128,11 @@ echo "<input type='submit' name='clear_selected_connections' value='clear_select
 echo "<input type='submit' name='update_ftp' value='update_ftp'>";
 echo '</form>';
 
-if (isset($_POST) and array_key_exists('update_ftp', $_POST) and array_key_exists('connections_ids', $_POST)) {
+if (isset($_POST) and array_key_exists('update_ftp', $_POST)) {
+	if (!array_key_exists('connections_ids', $_POST)) {
+		echo print_html_err("no connections selected");
+		$_POST['connections_ids'] = array();
+	}
 	foreach ($_POST['connections_ids'] as $connection_id) {
 		echo "<b>[$connection_id]: </b>: ". display_connection_params($_SESSION['connections_params'][$connection_id]);
 		echo "\n";
@@ -137,73 +146,63 @@ if (isset($_POST) and array_key_exists('update_ftp', $_POST) and array_key_exist
 		$ftp_pasv = ftp_pasv($ftp_conn, true);
 		echo "ftp_pasv: $ftp_pasv";
 		echo "\n";
-		$ftp_list = ftp_list($ftp_conn, $remote_dir, false);
-		print_r($ftp_list);
+		$ftp_list = ftp_list_raw($ftp_conn, $remote_dir, true, $regex_filter);
+		$local_list = local_list($local_dir, true, $regex_filter);
+		$backup_timestamp = date("Y-m-d H;i;s");
+		$ftp_update_backup_count = 0;
+		echo "<table border='1'>";
+		foreach (array_keys($ftp_list) as $filename) {
+			if (!is_file($local_dir."/".$filename)) continue;
+			if ($local_list[$filename]['size'] != $ftp_list[$filename]['size']) {
+				echo "<tr>";
+				echo "<td>$filename</td>";
+				echo "<td>".show_html_size_comparison($local_list[$filename]['size'], $ftp_list[$filename]['size'])."</td>";
+				$ftp_list[$filename]['date'] = ftp_mdtm($ftp_conn, "$remote_dir/$filename");
+				echo "<td>".show_html_timestamp_comparison($local_list[$filename]['date'], $ftp_list[$filename]['date'])."</td>";
+				ftp_update_backup($ftp_conn, $filename, $local_dir, $remote_dir, $backup_timestamp);
+				$ftp_update_backup_count++;
+				echo "</tr>";
+				echo "\n";
+			} else {
+				$local_list[$filename]['md5'] = md5_file($local_dir."/".$filename);
+				ob_start();
+				$ftp_get_result = ftp_get($ftp_conn, "php://output", "$remote_dir/$filename", FTP_BINARY);
+				$remote_content = ob_get_clean();
+				if (!$ftp_get_result) echo print_html_err("ftp_get failed");
+				$ftp_list[$filename]['md5'] = md5($remote_content);
+				if ($local_list[$filename]['md5'] != $ftp_list[$filename]['md5']) {
+					echo "<tr>";
+					echo "<td>$filename</td>";
+					echo "<td>".$local_list[$filename]['md5']."=>".$ftp_list[$filename]['md5']."</td>";
+					ftp_update_backup($ftp_conn, $filename, $local_dir, $remote_dir, $backup_timestamp);
+					$ftp_update_backup_count++;
+					echo "</tr>";
+					echo "\n";
+				}
+			}
+		}
+		echo "</table>";
+		if ($ftp_update_backup_count) {
+			echo "backup_timestamp: $backup_timestamp\n";
+		}
 		ftp_close($ftp_conn);
 		echo "\n\n";
 	}
 }
 
-
-exit();
-
-
-
-echo "<pre>";
-
-echo "remote_dir: <b>$remote_dir</b>/\n\n";
-
-// echo "<table border=1>";
-
-$files_data = array();
-
-print_r($ftp_list);
-
-// foreach (scandir($local_dir) as $item) {
-// 	if ($item == "." or $item == "..") continue;
-// 	$size = filesize($item);
-// 	$timestamp = filemtime($item);
-// 	$date = date("Y-m-d H:i:s", $timestamp);
-// 	array_push2($files_data, $item, array(
-// 		'local_date' => $date,
-// 		'local_size' => filesize($item),
-// 	));
-// }
-
-// foreach ($files_data as $file_name => &$file_data) {
-// 	if (!array_key_exists('remote_size', $file_data)) continue;
-// 	if ($file_data['remote_size'] == $file_data['local_size']) {
-// 		$file_data['local_checksum'] = md5_file($file_name);
-// 		ob_start();
-// 		$result = ftp_get($ftp_conn, "php://output", "$remote_dir/$file_name", FTP_BINARY);
-// 		$remote_content = ob_get_clean();
-// 		$file_data['remote_checksum'] = md5($remote_content);
-// 	}
-// }
-
-// foreach ($files_data as $file_name => &$file_data) {
-// 	if (!array_key_exists('remote_size', $file_data)) continue;
-// 	if (
-// 		$file_data['local_size'] == $file_data['remote_size']
-// 		and
-// 		$file_data['local_checksum'] == $file_data['remote_checksum']
-// 		)
-// 	{
-// 		continue;
-// 	}
-// 	$ftp_put_result = ftp_put($ftp_conn, "$remote_dir/$file_name", $file_name, FTP_BINARY);
-// 	echo print_info($file_name, $ftp_put_result);
-// 	echo "\n";
-// }
-
-// echo "\n\n";
-
-
-// print_r($files_data);
-
-
-// echo "</pre>";
-
+function ftp_update_backup($ftp_conn, $filename, $local_dir, $remote_dir, $timestamp) {
+  $backup_dir = ".__FTP_BACKUP/".$timestamp."/";
+  $backup_dir = $local_dir."/".$backup_dir;
+  if (!file_exists($backup_dir)) {
+  	mkdir($backup_dir, 0777, true);
+  }
+  $ftp_get_result = ftp_get($ftp_conn, "$backup_dir/$filename", "$remote_dir/$filename", FTP_BINARY);
+  if (!$ftp_get_result) echo print_html_err("ftp_get_result failed");
+  $remote_file_mtime = ftp_mdtm($ftp_conn, "$remote_dir/$filename");
+  touch("$backup_dir/$filename", $remote_file_mtime);
+  $ftp_put_result = ftp_put($ftp_conn, "$remote_dir/$filename", "$local_dir/$filename", FTP_BINARY);
+  if (!$ftp_put_result) echo print_html_err("ftp_put failed");
+}
 
 ?>
 
@@ -224,34 +223,82 @@ function print_info($msg, $status) {
 	return "<span style='color: $color'>$msg</span>";
 }
 
-function ftp_list($ftp_conn, $remote_dir, $recursive = false, $include_parent = false, $filter = false) {
+function ftp_list_raw($ftp_conn, $remote_dir, $files_only = false, $regex_filter = "") {
 	$rawlist = ftp_rawlist($ftp_conn, $remote_dir);
-	// file_put_contents("ftpUpdater_rawlist.txt", join("\n", $rawlist));
-	// $rawlist = explode("\n",file_get_contents("ftpUpdater_rawlist.txt"));
+	file_put_contents("ftpUpdater_rawlist.txt", join("\n", $rawlist));
+	$rawlist = explode("\n", file_get_contents("ftpUpdater_rawlist.txt"));
 	$processed_list = array();
 	foreach ($rawlist as &$item) {
 		if (preg_match("`^total \d+$`", $item)) continue;
-		if ($item[0] == 'd') $item .= "/";
+		if ($item[0] == 'd') {
+			if ($files_only) continue;
+			$item .= "/";
+		}
 		if (preg_match("`^[drwx-]{10} \d+ nobody nogroup +(?P<size>\d+) (?P<date>\w\w\w \d\d \d\d:\d\d|\w\w\w \d\d  \d\d\d\d) (?P<name>.*)`", $item, $m)) {
 		  $item = array();
+		  if($regex_filter !== "" and (!preg_match("`$regex_filter`i", $m['name']))) continue;
 			$item['size'] = $m['size'];
-			$item['name'] = $m['name'];
-			$timestamp = ftp_mdtm($ftp_conn, $remote_dir."/".$m['name']);
-			$item['date'] = $timestamp;
+			$item['date'] = $m['date'];
 		}
 		else user_error('wrong ftp line: $item');
-		$processed_list[] = $item;
+		$processed_list[$m['name']] = $item;
+	}
+	return $processed_list;
+}
+
+function local_list($dir, $files_only = false, $regex_filter = "") {
+  $processed_list = array();
+  foreach (new DirectoryIterator($dir) as $fileInfo) {
+    $filename = $fileInfo->getFilename();
+    if ($filename == "." or $filename == "..") continue;
+    if($fileInfo->isDir()) {
+    	if ($files_only) continue;
+    	$filename .= "/";
+    } else {
+    	$filesize = filesize($dir."/".$filename);
+    }
+    if($regex_filter !== "" and (!preg_match("`$regex_filter`i", $filename))) continue;
+    $filemtime = filemtime($dir."/".$filename);
+    $processed_list[$filename] = array(
+    	'size' => $filesize,
+    	'date' => $filemtime,
+    );
 	}
 	return $processed_list;
 }
 
 function display_connection_params($cp) {
 	$buf = "";
-	if (array_key_exists('filter', $cp)) {
-		$buf .= $cp['filter'] . '||';
+	if (array_key_exists('regex_filter', $cp) and $cp['regex_filter'] !== "") {
+		$buf .= $cp['regex_filter'] . '||';
 	}
 	$buf .= $cp['local_dir'] . " -> ". $cp['ftp_username'] . ':' . '***'. '@'. $cp['ftp_server']. $cp['remote_dir'];
 	return $buf;
+}
+function print_html_err($msg) {
+	return "<span style='color: red;'>$msg</span>\n";
+}
+
+function show_html_size_comparison($size1, $size2) {
+	if ($size1 > $size2) {
+		$size1 = "<b><u>$size1</u></b>";
+	}
+	if ($size2 > $size1) {
+		$size2 = "<b><u>$size2</u></b>";
+	}
+	return "$size1->$size2";
+}
+
+function show_html_timestamp_comparison($ts1, $ts2) {
+	$ts1_hr = date("Y-m-d H:i:s", $ts1);
+	$ts2_hr = date("Y-m-d H:i:s", $ts2);
+	if ($ts1 > $ts2) {
+		$ts1_hr = "<b><u>$ts1_hr</u></b>";
+	}
+	if ($ts2 > $ts1) {
+		$ts2_hr = "<b><u>$ts2_hr</u></b>";
+	}
+	return "$ts1_hr->$ts2_hr";
 }
 
 ?>

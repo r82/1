@@ -25,9 +25,8 @@ if (isset($_POST) and array_key_exists('clear_selected_connections', $_POST)) {
 
 if (!array_key_exists('connections_params', $_SESSION)) $_SESSION['connections_params'] = array();
 $connection_params = array();
-if (!array_key_exists('connection_params', $_SESSION)) {
-	$_SESSION['connection_params'] = array();
-}
+if (!array_key_exists('connection_params', $_SESSION)) $_SESSION['connection_params'] = array();
+
 if (isset($_POST) and array_key_exists('submit_connection', $_POST)) {
 	foreach(array('ftp_server', 'ftp_username', 'ftp_userpass', 'remote_dir', 'local_dir', 'regex_filter') as $key) {
 		if (!array_key_exists($key, $_POST)) continue;
@@ -64,6 +63,7 @@ if (isset($_POST) and array_key_exists('submit_connection', $_POST)) {
 <!DOCTYPE html>
 <html>
 <head>
+	<meta charset="utf-8" />
 	<title><?php echo basename(__FILE__); ?></title>
 	<style>
 		input[type="text"], input[type="password"]  {
@@ -94,7 +94,6 @@ if (isset($_POST) and array_key_exists('submit_connection', $_POST)) {
 		$buf .= "><br>\n";
 		return $buf;
 	}
-
 ?>
 
 <form method="post" style="clear: both;">

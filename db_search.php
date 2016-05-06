@@ -7,7 +7,10 @@ function exception_error_handler($errno, $errstr, $errfile, $errline ) {
 }
 set_error_handler("exception_error_handler");
 
-if ($_SERVER["REMOTE_ADDR"] !== '10.0.1.1') die();
+if ($_SERVER["REMOTE_ADDR"] !== '10.0.1.1') {
+  echo $_SERVER["REMOTE_ADDR"];
+  die();
+}
 
 session_start();
 if (isset($_POST) and array_key_exists('session_unset', $_POST)) {

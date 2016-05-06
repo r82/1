@@ -53,6 +53,9 @@ if (array_key_exists('tables', $_POST) and array_key_exists("submit_connection",
   <meta charset="utf-8" />
   <title><?php echo basename(__FILE__); ?></title>
   <style>
+  pre {
+    white-space: pre-wrap;
+  }
   input[type="text"], input[type="password"]  {
     width: 100%; 
     box-sizing: border-box;
@@ -242,8 +245,8 @@ if (array_key_exists('tables', $_POST) and array_key_exists('search_tables', $_P
         while ($row = $results->fetch_assoc()) {
           foreach ($row as $key => $value) {
             if ($value === NULL) continue;
-            echo "$key:\n";
-            echo htmlspecialchars($value);
+            echo "<b>$key: </b>";
+            echo htmlentities($value, ENT_QUOTES | ENT_SUBSTITUTE | ENT_HTML5, 'UTF-8', false);
             echo "\n";
           }
           echo "\n";

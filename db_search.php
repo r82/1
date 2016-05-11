@@ -14,43 +14,6 @@ if ($_SERVER["REMOTE_ADDR"] !== '10.0.1.1') {
 
 session_start();
 
-if (isset($_GET) and count($_GET)) {
-  print_r($_GET);
-  die();
-}
-
-if (isset($_POST) and array_key_exists('session_unset', $_POST)) {
-  session_unset();
-}
-
-$connection_params = array();
-if (!array_key_exists('connection_params', $_SESSION)) $_SESSION['connection_params'] = array();
-$connection_params = &$_SESSION['connection_params'];
-if (!array_key_exists('db_host', $connection_params) or $connection_params['db_host'] === "") {
-  $connection_params['db_host'] = "localhost";
-}
-
-if (isset($_POST)) {
-  foreach(array('db_host', 'db_user', 'db_password', 'search_string') as $key) {
-    if (!array_key_exists($key, $_POST)) continue;
-    $_POST[$key] = trim($_POST[$key]);
-    if ($key == 'db_host' and $_POST[$key] == "") {
-      $_POST[$key] = "localhost";
-    }
-    if ($key == "search_string") {
-      $_SESSION['search_string'] = $_POST['search_string'];
-      // http://stackoverflow.com/questions/1162491/alternative-to-mysql-real-escape-string-without-connecting-to-db
-      // we have to wait for a valid connection
-      $_SESSION['search_string_escaped'] = NULL;
-    }
-    $connection_params[$key] = $_POST[$key];
-  }
-}
-if (array_key_exists('tables', $_POST) and array_key_exists("submit_connection", $_POST)) {
-  unset($_POST['tables']);
-}
-
-// print_r($_POST);
 ?>
 
 <!DOCTYPE html>
@@ -78,6 +41,13 @@ if (array_key_exists('tables', $_POST) and array_key_exists("submit_connection",
   .number {
     text-align: right;
   }
+  .error {
+    color: red;
+    font-weight: bold;
+    border: 2px solid red;
+    background-color: yellow;
+    padding: 0 3px;
+  }
 </style>
 </head>
 <body>
@@ -86,6 +56,83 @@ if (array_key_exists('tables', $_POST) and array_key_exists("submit_connection",
   echo "<br> phpversion:". phpversion()."<br>";
 ?>
 
+<?php
+
+$connection_params = array();
+if (!array_key_exists('connection_params', $_SESSION)) $_SESSION['connection_params'] = array();
+$connection_params = &$_SESSION['connection_params'];
+if (!array_key_exists('db_host', $connection_params) or $connection_params['db_host'] === "") {
+  $connection_params['db_host'] = "localhost";
+}
+
+if (isset($_POST)) {
+  foreach(array('db_host', 'db_user', 'db_password', 'search_string') as $key) {
+    if (!array_key_exists($key, $_POST)) continue;
+    $_POST[$key] = trim($_POST[$key]);
+    if ($key == 'db_host' and $_POST[$key] == "") {
+      $_POST[$key] = "localhost";
+    }
+    if ($key == "search_string") {
+      $_SESSION['search_string'] = $_POST['search_string'];
+      // http://stackoverflow.com/questions/1162491/alternative-to-mysql-real-escape-string-without-connecting-to-db
+      // we have to wait for a valid connection
+      $_SESSION['search_string_escaped'] = NULL;
+    }
+    $connection_params[$key] = $_POST[$key];
+  }
+}
+
+$db = false;
+if (array_key_exists('db_user', $connection_params)) {
+  $db = new mysqli($connection_params['db_host'], $connection_params['db_user'], $connection_params['db_password']);
+}
+
+if (isset($_GET) and count($_GET)) {
+  $Database = $_GET['Database'];
+  $table = $_GET['table'];
+  $where = unserialize($_GET['where']);
+  $where_sql = array();
+  foreach ($where as $column => &$value) {
+    $where_sql[] = $column . " = '". $db->escape_string($value)."'";
+  }
+  $where_sql = join(" AND ", $where_sql);
+  if ($_POST) {
+    print_r($_POST);
+  }
+  $query_str = "SELECT * FROM $Database.$table WHERE $where_sql";
+  $results = $db->query($query_str);
+  $num_rows = $results->num_rows;
+  if ($num_rows !== 1) {
+    echo "<div class='error'>\$num_rows !== 1 : $num_rows</div>";
+  }
+  echo "<pre>\n";
+  echo "<form method='post'>";
+  $row = $results->fetch_assoc();
+  foreach ($row as $field => $value) {
+    echo "<b>$field:</b>";
+    if ( array_key_exists($field, $where)) {
+      echo "$value";
+    }
+    else {
+      echo "<input type='text' name='$field' value='$value'>";
+    }
+    echo "\n";
+  }
+  echo "<input type='submit' name='replace' value='replace'>";
+  echo "</form>";
+  die();
+}
+
+if (isset($_POST) and array_key_exists('session_unset', $_POST)) {
+  session_unset();
+}
+
+if (array_key_exists('tables', $_POST) and array_key_exists("submit_connection", $_POST)) {
+  unset($_POST['tables']);
+}
+
+// print_r($_POST);
+?>
 
 <form method="post" style='float: right;'>
   <input type="submit" name='session_unset' value="session_unset">
@@ -118,12 +165,11 @@ if (array_key_exists('tables', $_POST) and array_key_exists("submit_connection",
 
 <?php
 
-if (!array_key_exists('db_user', $connection_params)) {
-  echo "die";
+if ($db === false) {
+  echo '$db === false';
   die();
 }
 
-$db = new mysqli($connection_params['db_host'], $connection_params['db_user'], $connection_params['db_password']);
 // http://stackoverflow.com/questions/1162491/alternative-to-mysql-real-escape-string-without-connecting-to-db
 $_SESSION['search_string_escaped'] = $db->escape_string($_SESSION['search_string']);
 echo "search_string_escaped: ". $_SESSION['search_string_escaped']."<br>";
@@ -277,9 +323,12 @@ if (array_key_exists('tables', $_POST) and array_key_exists('search_tables', $_P
             'where' => call_user_func(function() use (&$db, &$primary_keys, &$row) {
               $where = array();
               foreach ($primary_keys as $primary_key) {
-                $where[] = $primary_key . " = '".$db->escape_string($row[$primary_key])."'";
+                // $where[] = $primary_key . " = '".$db->escape_string($row[$primary_key])."'";
+                $where[$primary_key] = $row[$primary_key];
               }
-              $where = join(" AND ", $where);
+              $where = serialize($where);
+              // $where = var_export($where);
+              // $where = join(" AND ", $where);
               return $where;
             }),
           ))."' target='_blank'>edit</a>";

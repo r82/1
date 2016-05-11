@@ -13,6 +13,12 @@ if ($_SERVER["REMOTE_ADDR"] !== '10.0.1.1') {
 }
 
 session_start();
+
+if (isset($_GET) and count($_GET)) {
+  print_r($_GET);
+  die();
+}
+
 if (isset($_POST) and array_key_exists('session_unset', $_POST)) {
   session_unset();
 }
@@ -181,7 +187,23 @@ if (array_key_exists('databases', $_POST) and (array_key_exists('get_tables', $_
           }
           echo ">";
         }
-        echo "$value</td>";
+        echo "$value";
+        if ($key == 'TABLE_NAME') {
+          echo "<br><i>";
+          $pks = show_primary_keys($db, "$Database.$value");
+          $results_describe = $db->query("DESCRIBE $Database.$value");
+          $fields = array();
+          while ($row_describe = $results_describe->fetch_assoc()) {
+            $Field = $row_describe['Field'];
+            if (in_array($Field, $pks)) {
+              $Field = "<b>$Field</b>";
+            }
+            $fields[] = $Field;
+          }
+          echo join(", ", $fields);
+          echo "</i>";
+        }
+        echo "</td>";
         if ($key == "TABLE_NAME") {
           echo "</label>";
         }
@@ -200,7 +222,9 @@ if (array_key_exists('tables', $_POST) and array_key_exists('search_tables', $_P
   foreach ($_POST['tables'] as $Database => $tables) {
     echo "<table border=1>";
     foreach ($tables as $table) {
-      echo "<b>$Database.$table</b><br>\n";
+      echo "<tr>";
+      echo "<td>";
+      echo "<b>$Database.$table</b>";
       $searchable_columns = array();
       $results = $db->query("DESCRIBE $Database.$table");
       while ($row = $results->fetch_assoc()) {
@@ -212,6 +236,7 @@ if (array_key_exists('tables', $_POST) and array_key_exists('search_tables', $_P
         if (preg_match("`^datetime`", $row['Type'])) continue;
         if (preg_match("`^blob`", $row['Type'])) continue;
 
+        // these we search, here only for reference
         // if (preg_match("`^varchar`", $row['Type'])) continue;
         // if (preg_match("`^enum`", $row['Type'])) continue;
         // if (preg_match("`^text`", $row['Type'])) continue;
@@ -222,14 +247,7 @@ if (array_key_exists('tables', $_POST) and array_key_exists('search_tables', $_P
         // print_r($row);
         $searchable_columns[] = $row['Field'];
       }
-      $primary_keys = array();
-      $results = $db->query("SHOW INDEX FROM $Database.$table");
-      while ($row = $results->fetch_assoc()) {
-        if ($row['Key_name'] !== "PRIMARY") continue;
-        $primary_keys[] = $row['Column_name'];
-      }
-      $primary_keys = join(", ", $primary_keys);
-      // echo $primary_keys;
+      $primary_keys = show_primary_keys($db, "$Database.$table");
       // http://stackoverflow.com/questions/4688782/use-the-if-else-condition-for-selecting-the-column-in-mysql
       $columns_if = array();
       $columns_like = array();
@@ -239,9 +257,12 @@ if (array_key_exists('tables', $_POST) and array_key_exists('search_tables', $_P
       }
       $columns_if = join(", ", $columns_if);
       $columns_like = join(" OR ", $columns_like);
-      $search_query = "SELECT $primary_keys, $columns_if FROM $Database.$table WHERE $columns_like";
+      $search_query = "SELECT ".join(", ", $primary_keys).", $columns_if FROM $Database.$table WHERE $columns_like";
       $results = $db->query($search_query);
       if ($results) {
+        if ($results->num_rows) {
+          echo "<br>\n";
+        }
         while ($row = $results->fetch_assoc()) {
           foreach ($row as $key => $value) {
             if ($value === NULL) continue;
@@ -249,19 +270,25 @@ if (array_key_exists('tables', $_POST) and array_key_exists('search_tables', $_P
             echo htmlentities($value, ENT_QUOTES | ENT_SUBSTITUTE | ENT_HTML5, 'UTF-8', false);
             echo "\n";
           }
+          echo "<a href='?".http_build_query(array(
+            'edit' => true,
+            'Database' => $Database,
+            'table' => $table,
+            'where' => call_user_func(function() use (&$db, &$primary_keys, &$row) {
+              $where = array();
+              foreach ($primary_keys as $primary_key) {
+                $where[] = $primary_key . " = '".$db->escape_string($row[$primary_key])."'";
+              }
+              $where = join(" AND ", $where);
+              return $where;
+            }),
+          ))."' target='_blank'>edit</a>";
+          echo "\n";
           echo "\n";
         }
       }
-      // foreach ($searchable_columns as $column) {
-      //   $search_query = "SELECT * FROM $Database.$table WHERE $column LIKE '%http://%'";
-      //   $results = $db->query($search_query);
-      //   if ($results) {
-      //     while ($row = $results->fetch_assoc()) {
-      //       echo "<b>$Database.$table.$column</b>:";
-      //       echo "\n";
-      //     }
-      //   }
-      // }
+      echo "</td>";
+      echo "</tr>";
       echo "\n";
     }
     echo "</table>";
@@ -269,6 +296,16 @@ if (array_key_exists('tables', $_POST) and array_key_exists('search_tables', $_P
 }
 
 mysqli_close($db);
+
+function show_primary_keys($db, $table) {
+  $primary_keys = array();
+  $results = $db->query("SHOW INDEX FROM $table");
+  while ($row = $results->fetch_assoc()) {
+    if ($row['Key_name'] !== "PRIMARY") continue;
+    $primary_keys[] = $row['Column_name'];
+  }
+  return $primary_keys;
+}
 
 ?>
 

@@ -11,6 +11,7 @@ if ($_SERVER["REMOTE_ADDR"] !== '10.0.1.1') {
   echo $_SERVER["REMOTE_ADDR"];
   die();
 }
+date_default_timezone_set('Europe/Warsaw');
 
 session_start();
 
@@ -25,7 +26,7 @@ session_start();
   pre {
     white-space: pre-wrap;
   }
-  input[type="text"], input[type="password"]  {
+  input[type="text"], input[type="password"], input[type="number"], textarea  {
     width: 100%; 
     box-sizing: border-box;
     -webkit-box-sizing:border-box;
@@ -85,41 +86,90 @@ if (isset($_POST)) {
 $db = false;
 if (array_key_exists('db_user', $connection_params)) {
   $db = new mysqli($connection_params['db_host'], $connection_params['db_user'], $connection_params['db_password']);
+  $db->set_charset("utf8");
 }
 
-if (isset($_GET) and count($_GET)) {
-  $Database = $_GET['Database'];
-  $table = $_GET['table'];
-  $where = unserialize($_GET['where']);
-  $where_sql = array();
-  foreach ($where as $column => &$value) {
-    $where_sql[] = $column . " = '". $db->escape_string($value)."'";
-  }
-  $where_sql = join(" AND ", $where_sql);
-  if ($_POST) {
-    print_r($_POST);
-  }
-  $query_str = "SELECT * FROM $Database.$table WHERE $where_sql";
+function sql_get_single_row($db, $query_str) {
   $results = $db->query($query_str);
   $num_rows = $results->num_rows;
   if ($num_rows !== 1) {
     echo "<div class='error'>\$num_rows !== 1 : $num_rows</div>";
   }
-  echo "<pre>\n";
-  echo "<form method='post'>";
   $row = $results->fetch_assoc();
+  return $row;
+}
+
+function show_columns_info($db, $Database, $table) {
+  $results = $db->query("SHOW COLUMNS FROM $table IN $Database;");
+  $columns = array();
+  while ($row = $results->fetch_assoc()) {
+    $columns[$row['Field']] = array(
+      'Type' => $row['Type'],
+      'Extra' => $row['Extra'],
+    );
+    $columns[$row['Field']] = join(" ", $columns[$row['Field']]);
+    $columns[$row['Field']] = trim($columns[$row['Field']]);
+  }
+  return $columns;
+}
+
+function create_sql_update_str($db, $table, array $columns, $where) {
+  $ustr = "UPDATE $table SET";
+  foreach ($columns as $field => $value) {
+    $ustr .= " $field = '".$db->escape_string($value)."' ";
+  }
+  $ustr .= "WHERE $where;";
+  return $ustr;
+}
+
+if (isset($_GET) and count($_GET)) {
+  echo "<pre>\n";
+  $Database = $_GET['Database'];
+  $table = $_GET['table'];
+  $where_sql = array();
+  foreach ($_GET['where'] as $column => &$value) {
+    $where_sql[] = $column . " = '". $db->escape_string($value)."'";
+  }
+  $where_sql = join(" AND ", $where_sql);
+  $query_str = "SELECT * FROM $Database.$table WHERE $where_sql";
+  $row = sql_get_single_row($db, $query_str);
+  if ($_POST) {
+    $backup_query = create_sql_update_str($db, "$Database.$table", array_diff_key(array_diff($row, $_POST['row']), $_GET['where']), $where_sql);
+    $log_directory = getcwd();
+    $log_file_name = preg_replace('/^.+[\\\\\\/]/', '', __FILE__).".log.sql";
+    $fh = fopen($log_file_name, 'a') or die("<span class='error'>Can't create file: $log_file_name</span>");
+    if (fwrite($fh, "\n"."-- ".date("Y-m-d H:i:s")."\n".$backup_query."\n\n") === false) {
+      die("<span class='error'>fwrite === false</span>");
+    }
+    fclose($fh);
+    print_r(array_diff($_POST['row'], $row));
+  }
+  $pks = show_primary_keys($db, "$Database.$table");
+  $columns_info = show_columns_info($db, $Database, $table);
+  echo "<form method='post'>";
   foreach ($row as $field => $value) {
-    echo "<b>$field:</b>";
-    if ( array_key_exists($field, $where)) {
-      echo "$value";
+    if (in_array($field, $pks)) {
+      echo "(PK) ";
+    }
+    echo "<b>$field</b>";
+    echo " <i>".$columns_info[$field]."</i>";
+    echo "<b>: </b>";
+    $value_html = htmlspecialchars($value, ENT_QUOTES | ENT_DISALLOWED);
+    if ( array_key_exists($field, $_GET['where'])) {
+      echo "$value_html";
+    }
+    elseif (!strstr($value, "\n")) {
+      echo "<input type='text' name='row[$field]' value='$value_html'>";
     }
     else {
-      echo "<input type='text' name='$field' value='$value'>";
+      $lines = substr_count($value, "\n");
+      echo "<textarea name='row[$field]' rows='$lines'>$value_html</textarea>";
     }
     echo "\n";
   }
   echo "<input type='submit' name='replace' value='replace'>";
   echo "</form>";
+  echo "\n\n\n";
   die();
 }
 
@@ -316,22 +366,15 @@ if (array_key_exists('tables', $_POST) and array_key_exists('search_tables', $_P
             echo htmlentities($value, ENT_QUOTES | ENT_SUBSTITUTE | ENT_HTML5, 'UTF-8', false);
             echo "\n";
           }
-          echo "<a href='?".http_build_query(array(
-            'edit' => true,
-            'Database' => $Database,
-            'table' => $table,
-            'where' => call_user_func(function() use (&$db, &$primary_keys, &$row) {
-              $where = array();
-              foreach ($primary_keys as $primary_key) {
-                // $where[] = $primary_key . " = '".$db->escape_string($row[$primary_key])."'";
-                $where[$primary_key] = $row[$primary_key];
-              }
-              $where = serialize($where);
-              // $where = var_export($where);
-              // $where = join(" AND ", $where);
-              return $where;
-            }),
-          ))."' target='_blank'>edit</a>";
+          echo "<form method='get' target='_blank'>";
+          echo "<input type='submit' name='edit_row' value='edit_row'>";
+          echo "<input type='hidden' name='Database' value='$Database'>";
+          echo "<input type='hidden' name='table' value='$table'>";
+          foreach ($primary_keys as $primary_key) {
+            $value_html = htmlspecialchars($row[$primary_key], ENT_QUOTES | ENT_DISALLOWED);
+            echo "<input type='hidden' name='where[$primary_key]' value='$value_html'>";
+          }
+          echo "</form>";
           echo "\n";
           echo "\n";
         }

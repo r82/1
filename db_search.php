@@ -134,7 +134,7 @@ if (isset($_GET) and count($_GET)) {
   $query_str = "SELECT * FROM $Database.$table WHERE $where_sql";
   $row = sql_get_single_row($db, $query_str);
   if ($_POST) {
-    $backup_query = create_sql_update_str($db, "$Database.$table", array_diff_key(array_diff($row, $_POST['row']), $_GET['where']), $where_sql);
+    $backup_query = create_sql_update_str($db, "$Database.$table", array_diff_assoc(array_diff_assoc($row, $_POST['row']), $_GET['where']), $where_sql);
     $log_directory = getcwd();
     $log_file_name = preg_replace('/^.+[\\\\\\/]/', '', __FILE__).".log.sql";
     $fh = fopen($log_file_name, 'a') or die("<span class='error'>Can't create file: $log_file_name</span>");
@@ -142,7 +142,8 @@ if (isset($_GET) and count($_GET)) {
       die("<span class='error'>fwrite === false</span>");
     }
     fclose($fh);
-    print_r(array_diff($_POST['row'], $row));
+    $update_query = create_sql_update_str($db, "$Database.$table", array_diff_assoc($_POST['row'], $row), $where_sql);
+    
   }
   $pks = show_primary_keys($db, "$Database.$table");
   $columns_info = show_columns_info($db, $Database, $table);

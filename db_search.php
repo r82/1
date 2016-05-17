@@ -15,6 +15,10 @@ date_default_timezone_set('Europe/Warsaw');
 
 session_start();
 
+if (isset($_POST) and array_key_exists('session_unset', $_POST)) {
+  session_unset();
+}
+
 ?>
 
 <!DOCTYPE html>
@@ -53,11 +57,12 @@ session_start();
 </head>
 <body>
 
-<?php
-  echo "<br> phpversion:". phpversion()."<br>";
-?>
+<form method="post" style='float: right;'>
+  <input type="submit" name='session_unset' value="session_unset">
+</form>
 
 <?php
+echo "<br> phpversion:". phpversion()."<br>";
 
 $connection_params = array();
 if (!array_key_exists('connection_params', $_SESSION)) $_SESSION['connection_params'] = array();
@@ -174,22 +179,11 @@ if (isset($_GET) and count($_GET)) {
   die();
 }
 
-if (isset($_POST) and array_key_exists('session_unset', $_POST)) {
-  session_unset();
-}
-
 if (array_key_exists('tables', $_POST) and array_key_exists("submit_connection", $_POST)) {
   unset($_POST['tables']);
 }
 
 // print_r($_POST);
-?>
-
-<form method="post" style='float: right;'>
-  <input type="submit" name='session_unset' value="session_unset">
-</form>
-
-<?php
   function show_input_field($name, $source_arr, $type="text") {
     $buf = "";
     $buf .= "$name: <input type='".$type."' name='$name'";

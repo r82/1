@@ -1,19 +1,53 @@
 #!/bin/bash
 
-# parameters
-# 1 - destination folder
-# 2 - source folder, files that we are going to save
-# 3 - regex used to catch file names, if == <guess_text_files_by_content> then files that are text-only are stored
-# 4 - date format
-# all parameters are optional
+#==============================================================================
 
+# example usage:
+# bash folder_backup.sh --backup_src public_html --backup_dst backups
+
+#==============================================================================
+
+
+
+
+# http://www.bahmanm.com/blogs/command-line-options-how-to-parse-in-bash-using-getopt
+
+if [ $(($#%2)) -ne 0 ]; then
+	>&2 echo "error: uneven number of arguments"
+fi
+declare -A args
+count=0
+last_arg=""
+for var in "$@"
+do
+	if [ $((count%2)) -eq 0 ]; then
+		echo $var
+    if [ ${var:0:2} != "--" ]; then
+    	>&2 echo "error: wrong argument name  "$var
+    fi
+    last_arg=${var:2}
+	fi
+	if [ $((count%2)) -ne 0 ]; then
+		args[$last_arg]=$var
+	fi
+  (( count++ ))
+done
+
+# for i in "${!args[@]}"
+# do
+#   echo "key  : $i"
+#   echo "value: ${args[$i]}"
+# done
 
 # echo "BASH_VERSION: $BASH_VERSION"
 
 # http://stackoverflow.com/questions/3601515/how-to-check-if-a-variable-is-set-in-bash
+# http://stackoverflow.com/questions/13219634/easiest-way-to-check-for-an-index-or-a-key-in-an-array
+
+
 backup_src="."
-if [ ! -z ${2+x} ]; then
-	backup_src=$2
+if [ ${args[backup_src]+x} ]; then
+	backup_src=${args[backup_src]}
 fi
 backup_src=${backup_src%/}/
 if [ ! -d "$backup_src" ]; then
@@ -22,8 +56,8 @@ if [ ! -d "$backup_src" ]; then
 fi
 
 backup_dst="./"
-if [ ! -z ${1+x} ]; then
-	backup_dst=$1
+if [ ${args[backup_dst]+x} ]; then
+	backup_dst=${args[backup_dst]}
 fi
 
 if [ ${backup_dst:0:1} != "/" ]; then
@@ -39,8 +73,8 @@ echo "backup_src: "$(realpath -e $backup_src)"/"
 
 # http://www.file-extensions.org/filetype/extension/name/text-files
 backup_regex=".*"
-if [ ! -z ${3+x} ]; then
-	backup_regex=$3
+if [ ${args[backup_regex]+x} ]; then
+	backup_regex=${args[backup_regex]}
 fi
 
 if [ "$backup_regex" = "<guess_text_files_by_ext>" ]; then
@@ -48,8 +82,8 @@ if [ "$backup_regex" = "<guess_text_files_by_ext>" ]; then
 fi
 
 backup_date_format="%Y-%m-%d_%H%M%S"
-if [ ! -z ${4+x} ]; then
-	backup_regex=$4
+if [ ${args[backup_date_format]+x} ]; then
+	backup_date_format=${args[backup_date_format]}
 fi
 
 backup_name=${PWD##*/}

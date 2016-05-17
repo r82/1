@@ -18,3 +18,6 @@ find . -regextype sed -regex 'cron'
 # http://superuser.com/questions/11008/how-do-i-find-out-what-version-of-linux-im-running
 uname -a
 cat /etc/*{release,version,issue}
+
+
+temp_file_name=$(cat /dev/urandom | tr -dc 'a-z0-9' | fold -w 32 | head -n 1)

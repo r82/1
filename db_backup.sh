@@ -1,7 +1,19 @@
 #!/bin/bash
 
+#==============================================================================
+
+# example usage:
+# INSECURE way
+#  bash db_backup.sh --db_user root --db_pass my_insecure_WARNING_pass --db_name my_db_name --backup_dst sql_backup_folder
+# SECURE way
+#  bash db_backup.sh --sqlpwd_file .sqlpwd --db_name my_db_name --backup_dst sql_backup_folder
+
 # http://stackoverflow.com/questions/9293042/mysqldump-without-the-password-prompt
 # http://serverfault.com/questions/476228/whats-a-secure-alternative-to-using-a-mysql-password-on-the-command-line
+
+#==============================================================================
+
+
 
 # http://www.bahmanm.com/blogs/command-line-options-how-to-parse-in-bash-using-getopt
 if [ $(($#%2)) -ne 0 ]; then

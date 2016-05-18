@@ -11,7 +11,6 @@
 
 
 # http://www.bahmanm.com/blogs/command-line-options-how-to-parse-in-bash-using-getopt
-
 if [ $(($#%2)) -ne 0 ]; then
 	>&2 echo "error: uneven number of arguments"
 fi
@@ -21,7 +20,6 @@ last_arg=""
 for var in "$@"
 do
 	if [ $((count%2)) -eq 0 ]; then
-		echo $var
     if [ ${var:0:2} != "--" ]; then
     	>&2 echo "error: wrong argument name  "$var
     fi
@@ -59,7 +57,6 @@ backup_dst="./"
 if [ ${args[backup_dst]+x} ]; then
 	backup_dst=${args[backup_dst]}
 fi
-
 if [ ${backup_dst:0:1} != "/" ]; then
 	backup_dst=$PWD"/"$backup_dst
 fi

@@ -68,7 +68,7 @@ fi
 if [ ! -d "$backup_dst" ]; then
   mkdir -p "$backup_dst"
 fi
-backup_dst=$(realpath -e $backup_dst)
+# backup_dst=$(realpath -e $backup_dst) # some servers deny permisson
 backup_dst=${backup_dst%/}/
 echo "backup_dst: $backup_dst"
 
@@ -84,7 +84,7 @@ backup_file_name_UNFINISHED=$backup_file_name".UNFINISHED"
 if [[ $db_user ]]  && [[ $db_pass ]]; then
  mysqldump --user="$db_user" --password="$db_pass" -h "$db_host" "$db_name" | gzip -v > $backup_file_name_UNFINISHED
 elif [[ $sqlpwd_file ]]; then
- 	mysqldump --defaults-extra-file=$sqlpwd_file -h "$db_host" "$db_name" | gzip -v > $backup_file_name_UNFINISHED
+ 	mysqldump --defaults-extra-file="$sqlpwd_file" -h "$db_host" "$db_name" | gzip -v > $backup_file_name_UNFINISHED
 fi
 
 mv "$backup_file_name_UNFINISHED" "$backup_file_name"

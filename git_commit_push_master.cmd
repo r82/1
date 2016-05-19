@@ -1,4 +1,6 @@
+:: http://stackoverflow.com/questions/1967370/git-replacing-lf-with-crlf
 git config --local core.autocrlf false
+
 git add *
 git commit -a --allow-empty-message -m ''
 git push origin

@@ -30,6 +30,7 @@
 
 :: http://stackoverflow.com/questions/1967370/git-replacing-lf-with-crlf
 git config --local core.autocrlf false
+git stash
 git pull
 git add -A
 git status

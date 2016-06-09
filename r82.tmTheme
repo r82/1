@@ -50,7 +50,11 @@
 			<key>settings</key>
 			<dict>
 				<key>foreground</key>
+<<<<<<< HEAD
 				<string>#77ff77</string>
+=======
+				<string>#90C11F</string>
+>>>>>>> b776612388f0d6a25b10eaba2de517c708d8c58f
 				<key>fontStyle</key>
 				<string> italic</string>
 			</dict>
@@ -305,6 +309,7 @@
 		</dict>
 		<dict>
 			<key>name</key>
+<<<<<<< HEAD
 			<string>meta.structure.dictionary.json</string>
 			<key>scope</key>
 			<string>meta.structure.dictionary.json</string>
@@ -319,6 +324,11 @@
 			<string>string.quoted</string>
 			<key>scope</key>
 			<string>string.quoted</string>
+=======
+			<string>JSON String</string>
+			<key>scope</key>
+			<string>meta.structure.dictionary.json string.quoted.double.json</string>
+>>>>>>> b776612388f0d6a25b10eaba2de517c708d8c58f
 			<key>settings</key>
 			<dict>
 				<key>foreground</key>
@@ -641,17 +651,27 @@
 		</dict>
 		<dict>
 			<key>name</key>
+<<<<<<< HEAD
 			<string>meta.function.json</string>
+=======
+			<string>meta.function</string>
+>>>>>>> b776612388f0d6a25b10eaba2de517c708d8c58f
 			<key>scope</key>
 			<string>meta.function.json</string>
 			<key>settings</key>
 			<dict>
+<<<<<<< HEAD
+=======
+				<key>fontStyle</key>
+				<string> bold</string>
+>>>>>>> b776612388f0d6a25b10eaba2de517c708d8c58f
 				<key>foreground</key>
 				<string>#ffff00</string>
 			</dict>
 		</dict>
 		<dict>
 			<key>name</key>
+<<<<<<< HEAD
 			<string>variable.function</string>
 			<key>scope</key>
 			<string>variable.function</string>
@@ -663,6 +683,8 @@
 		</dict>
 		<dict>
 			<key>name</key>
+=======
+>>>>>>> b776612388f0d6a25b10eaba2de517c708d8c58f
 			<string>constant.language.boolean.false</string>
 			<key>scope</key>
 			<string>constant.language.boolean.false</string>
@@ -768,6 +790,20 @@
 		</dict>
 		<dict>
 			<key>name</key>
+<<<<<<< HEAD
+=======
+			<string>comment.line.colons</string>
+			<key>scope</key>
+			<string>comment.line.colons</string>
+			<key>settings</key>
+			<dict>
+				<key>foreground</key>
+				<string>#90C11F</string>
+			</dict>
+		</dict>
+		<dict>
+			<key>name</key>
+>>>>>>> b776612388f0d6a25b10eaba2de517c708d8c58f
 			<string>keyword.control.statement</string>
 			<key>scope</key>
 			<string>keyword.control.statement</string>
